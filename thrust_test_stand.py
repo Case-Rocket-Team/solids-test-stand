@@ -4,6 +4,7 @@ from enum import StrEnum
 
 PORT = 'COM3'  # Replace with arduino port
 BAUD_RATE = 57600
+TRANSMIT_DATA = False  # Set to False to send commands/status only over serial.
 
 class MsgType(StrEnum):
     INFO = "[I]"
@@ -59,7 +60,8 @@ def serialHandshake(serial_com, log_file):
         message, msgtype = receiveSerialMessage(serial_com, log_file)
         if msgtype == MsgType.RQST and message == "TIME_REQ":
             timestamp = int(time.time())
-            sync_message = f"TIME_SYNC:{timestamp}"
+            transmission_mode = "FULL" if TRANSMIT_DATA else "COMMANDS"
+            sync_message = f"TIME_SYNC:{timestamp}:{transmission_mode}"
             sendSerialMessage(serial_com, log_file, sync_message)
 
         if msgtype == MsgType.RQST and message.startswith("TIME_ACK:"):
@@ -73,17 +75,28 @@ def serialHandshake(serial_com, log_file):
         time.sleep(1)
 
 def recordData(serial_com, log_file):
-    message = ""
-    data_file_name = "testfire_data_" + time.strftime("%Y%m%d_%H%M%S") + ".csv"
-    with open(data_file_name, "a") as data_file:
+    data_file = None
+    data_file_name = None
+    if TRANSMIT_DATA:
+        data_file_name = "testfire_data_" + time.strftime("%Y%m%d_%H%M%S") + ".csv"
+        data_file = open(data_file_name, "a")
+
+    try:
         while True:
             message, msgtype = receiveSerialMessage(serial_com, log_file)
             if msgtype == MsgType.DATA:
-                data_file.write(message + "\n")
+                if data_file is not None:
+                    data_file.write(message + "\n")
                 continue
             if msgtype == MsgType.INFO and message == "Finished Logging Data":
-                print(f"Data recording complete. Data saved to {data_file_name}.")
+                if data_file_name is not None:
+                    print(f"Data recording complete. Data saved to {data_file_name}.")
+                else:
+                    print("Logging complete. Data transmission was disabled; data remains on the SD card.")
                 return
+    finally:
+        if data_file is not None:
+            data_file.close()
 
 def checkResponse(serial_com, log_file, command):
     """

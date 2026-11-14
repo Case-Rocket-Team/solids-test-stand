@@ -39,6 +39,7 @@ unsigned long logBeginTime;
 bool armed = false;
 bool fired = false;
 bool finishfire = false;
+bool transmitData = true;
 
 HX711 loadCell;
 
@@ -98,7 +99,9 @@ void loop() {
             // Record data and write etc
             data = generateDataPacket();
             lastLogMillis = millis();
-            writeData2Serial(data);
+            if (transmitData) {
+                writeData2Serial(data);
+            }
             writeData2Card(data);
         }
     }
@@ -204,10 +207,20 @@ void serialHandshake(){
         if(Serial1.available() > 0){
             String message = Serial1.readStringUntil('\n');
             if(message.startsWith("TIME_SYNC:")){
-                String timestampStr = message.substring(10);
+                String syncPayload = message.substring(10);
+                int modeSeparator = syncPayload.indexOf(':');
+                String timestampStr = modeSeparator == -1
+                    ? syncPayload
+                    : syncPayload.substring(0, modeSeparator);
+                String transmissionMode = modeSeparator == -1
+                    ? "FULL"
+                    : syncPayload.substring(modeSeparator + 1);
                 time_t pctime = timestampStr.toInt();
 
-                if(pctime>0){
+                if (transmissionMode != "FULL" && transmissionMode != "COMMANDS") {
+                    printINFO("Invalid data transmission mode");
+                } else if(pctime>0){
+                    transmitData = transmissionMode == "FULL";
                     setTime(pctime);
                     isSynced = true;
                     sendREQUEST("TIME_ACK:" + String((unsigned long)now()));
