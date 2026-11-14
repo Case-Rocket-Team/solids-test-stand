@@ -16,13 +16,13 @@ const int SD_CS = 8;
 const int LOAD_DOUT = 9;
 const int LOAD_SCK = 10;
 const float calibration_factor = -7050.0; //change to whatever calibration factor of load cell is
-const int PRESS_PIN =
+const int PRESS_PIN = 1;
 const unsigned long armTimeout = 5;
-const unsigned long logTimeout = 2;
+const unsigned long logTimeout = .5;
 const unsigned long fireDelay = 1000; //delay between logging start and fire
 const unsigned long fireDuration = 100; //time that fire is pulled high
 const int analogResolutionBits = 14; //change to 10 for non-R4 boards
-const int sampling_freq = 200; //Hz
+const int sampling_freq = 50; //Hz
 
 String filename; 
 File dataFile;  
@@ -38,6 +38,7 @@ unsigned long elapsedTime;
 unsigned long logBeginTime;
 bool armed = false;
 bool fired = false;
+bool finishfire = false;
 
 HX711 loadCell;
 
@@ -45,19 +46,20 @@ void setup(){
     Serial.begin(9600);
     Serial1.begin(57600);
     analogReadResolution(analogResolutionBits);
-
     if(!SD.begin(SD_CS)){
         printINFO("SD Intialization failed. Ensure card is inserted and wiring is correct. Reset board to clear this message.");
     }
     dataBuffer.reserve(1024);
-    loadCell.begin(LOAD_DOUT, LOAD_SCK);
-    loadCell.set_scale(calibration_factor);
-    loadCell.tare();
+    //loadCell.begin(LOAD_DOUT, LOAD_SCK);
+    //loadCell.set_scale(calibration_factor);
+    //loadCell.tare();
     pinMode(ARM2, OUTPUT);
     pinMode(FIRE, OUTPUT);
     digitalWrite(ARM2, LOW);
     digitalWrite(FIRE, LOW);
     
+    printINFO("Successfully Initialized");
+
     serialHandshake();
 }
 
@@ -65,17 +67,19 @@ void loop() {
     
     digitalWrite(FIRE, LOW);
 
-    if(loggingData && (millis()-logBeginTime) > fireDelay){
+    if(loggingData && (millis()-logBeginTime) > fireDelay && fired == false){
         digitalWrite(ARM2, LOW);
         digitalWrite(FIRE, HIGH);
         printINFO("FIRED");
         fired = true;
+        finishfire = true;
         fireTime = millis();
     }
 
-    if(fired && (millis()- fireTime) > fireDuration){
+    if(fired && (millis()- fireTime) > fireDuration && finishfire){
         digitalWrite(FIRE, LOW);
         printINFO("Finished Firing");
+        finishfire = false;
     }
 
     // Add code to stop logging after done launching or smth
@@ -86,6 +90,8 @@ void loop() {
                 dataFile.close();
             }
             loggingData = false;
+            fired = false;
+            printINFO("Finished Logging Data");
         }
         else if ((millis() - lastLogMillis) >= (1000/sampling_freq))
         {
@@ -111,6 +117,7 @@ void loop() {
         } else if(command == "FIRE") {
             if (armed) {
                 filename = String("firedata_") + String((unsigned long)now()) + ".csv";
+                filename = "fd_" + String((int)now() % 100000) + ".csv"; 
                 dataFile = SD.open(filename, FILE_WRITE);
                 if (!dataFile) {
                     printINFO("Failed to open log file: " + filename);
@@ -119,6 +126,7 @@ void loop() {
                     logBeginTime = millis();
                     loggingData = true;
                     armed = false;
+                    printINFO("Logging started");
                 } 
             } else {
                 printINFO("Cannot fire: Arm 2 is not activated");
@@ -134,15 +142,17 @@ void loop() {
 }
 
 String generateDataPacket(){ 
+    return String("1,2,3\n");
     String time = String((unsigned long)now());
     String pressure = String(readPressure());
     String thrust = String(loadCell.get_units());
     
-    return String(time + "," + thrust + "," + pressure);
+    return String(time + "," + thrust + "," + pressure +"\n");
 }
 
 void writeData2Serial(String data){
     Serial1.println("[D]" + data);
+    Serial.println("[D]" + data);
 }
 
 void writeData2Card(String data){
