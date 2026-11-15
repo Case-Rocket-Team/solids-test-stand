@@ -5,6 +5,8 @@ from enum import StrEnum
 PORT = 'COM3'  # Replace with arduino port
 BAUD_RATE = 57600
 TRANSMIT_DATA = False  # Set to False to send commands/status only over serial.
+SERIAL_RESPONSE_TIMEOUT_SECONDS = 15
+DATA_RECORD_TIMEOUT_SECONDS = 120
 
 class MsgType(StrEnum):
     INFO = "[I]"
@@ -77,12 +79,17 @@ def serialHandshake(serial_com, log_file):
 def recordData(serial_com, log_file):
     data_file = None
     data_file_name = None
+    deadline = time.monotonic() + DATA_RECORD_TIMEOUT_SECONDS
     if TRANSMIT_DATA:
         data_file_name = "testfire_data_" + time.strftime("%Y%m%d_%H%M%S") + ".csv"
         data_file = open(data_file_name, "a")
 
     try:
         while True:
+            if time.monotonic() >= deadline:
+                error = "Timed out waiting for the test stand to finish logging."
+                logMessage(log_file, "INFO", error, clean_msg=False)
+                raise TimeoutError(error)
             message, msgtype = receiveSerialMessage(serial_com, log_file)
             if msgtype == MsgType.DATA:
                 if data_file is not None:
@@ -95,15 +102,15 @@ def recordData(serial_com, log_file):
                     print("Logging complete. Data transmission was disabled; data remains on the SD card.")
                 return
     finally:
-        if data_file is not None:
+        if data_file is not None and not data_file.closed:
             data_file.close()
 
-def checkResponse(serial_com, log_file, command):
+def checkResponse(serial_com, log_file, command, timeout=SERIAL_RESPONSE_TIMEOUT_SECONDS):
     """
-    Logs the response after sending a command, true/false only used for firing right now
+    Waits for the command response and returns False for a device error or timeout.
     """
-    message = ""
-    while True:#message != None: Change
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
         message, msgtype = receiveSerialMessage(serial_com, log_file)
         if msgtype == MsgType.INFO:
             match command:
@@ -113,9 +120,14 @@ def checkResponse(serial_com, log_file, command):
                 case "fire" | "f": 
                     if message == 'Logging started':
                         return True
+                    if message.startswith("Failed to") or message.startswith("Cannot fire:"):
+                        logMessage(log_file, "INFO", f"Command failed: {message}", clean_msg=False)
+                        return False
                 case "disarm" | "d":
                     if message == "DISARMED":
                         return True
+    error = f"Timed out waiting for response to '{command}'."
+    logMessage(log_file, "INFO", error, clean_msg=False)
     return False
 
 

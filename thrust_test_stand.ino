@@ -16,13 +16,14 @@ const int SD_CS = 8;
 const int LOAD_DOUT = 9;
 const int LOAD_SCK = 10;
 const float calibration_factor = -7050.0; //change to whatever calibration factor of load cell is
-const int PRESS_PIN = 1;
-const unsigned long armTimeout = 5;
-const unsigned long logTimeout = .5;
+const int PRESS_PIN = A0;
+const unsigned long armTimeout = 5.0;
+const unsigned long logTimeout = 0.5;
 const unsigned long fireDelay = 1000; //delay between logging start and fire
 const unsigned long fireDuration = 100; //time that fire is pulled high
 const int analogResolutionBits = 14; //change to 10 for non-R4 boards
 const int sampling_freq = 50; //Hz
+const unsigned long maxLogFileIndex = 9999999UL;
 
 String filename; 
 File dataFile;  
@@ -36,6 +37,7 @@ unsigned long fireTime;
 unsigned long fireElapsedTime;
 unsigned long elapsedTime;
 unsigned long logBeginTime;
+unsigned long logBeginEpoch;
 bool armed = false;
 bool fired = false;
 bool finishfire = false;
@@ -51,9 +53,9 @@ void setup(){
         printINFO("SD Intialization failed. Ensure card is inserted and wiring is correct. Reset board to clear this message.");
     }
     dataBuffer.reserve(1024);
-    //loadCell.begin(LOAD_DOUT, LOAD_SCK);
-    //loadCell.set_scale(calibration_factor);
-    //loadCell.tare();
+    loadCell.begin(LOAD_DOUT, LOAD_SCK);
+    loadCell.set_scale(calibration_factor);
+    loadCell.tare();
     pinMode(ARM2, OUTPUT);
     pinMode(FIRE, OUTPUT);
     digitalWrite(ARM2, LOW);
@@ -66,7 +68,6 @@ void setup(){
 
 void loop() {
     
-    digitalWrite(FIRE, LOW);
 
     if(loggingData && (millis()-logBeginTime) > fireDelay && fired == false){
         digitalWrite(ARM2, LOW);
@@ -75,6 +76,8 @@ void loop() {
         fired = true;
         finishfire = true;
         fireTime = millis();
+    } else if(!loggingData){
+        digitalWrite(FIRE, LOW);
     }
 
     if(fired && (millis()- fireTime) > fireDuration && finishfire){
@@ -85,7 +88,7 @@ void loop() {
 
     // Add code to stop logging after done launching or smth
     if(loggingData){
-        if((millis() - logBeginTime)/60000 > logTimeout){
+        if(float((millis() - logBeginTime)/60000) > logTimeout){
             flushDataBuffer();
             if(dataFile){
                 dataFile.close();
@@ -105,7 +108,7 @@ void loop() {
             writeData2Card(data);
         }
     }
-    if(armed == true && (millis() - armedTime)/60000 > armTimeout) {
+    if(armed == true && float((millis() - armedTime)/60000) > armTimeout) {
         armed = false;
         digitalWrite(ARM2, LOW);
         printINFO("DISARMED: Arm timed out after " + String(armTimeout) + " minutes");
@@ -119,17 +122,21 @@ void loop() {
             printINFO("ARMED");
         } else if(command == "FIRE") {
             if (armed) {
-                filename = String("firedata_") + String((unsigned long)now()) + ".csv";
-                filename = "fd_" + String((int)now() % 100000) + ".csv"; 
-                dataFile = SD.open(filename, FILE_WRITE);
-                if (!dataFile) {
-                    printINFO("Failed to open log file: " + filename);
-                    loggingData = false;
+                filename = createUniqueFilename();
+                if (filename.length() == 0) {
+                    printINFO("Failed to create a unique log filename");
                 } else {
-                    logBeginTime = millis();
-                    loggingData = true;
-                    armed = false;
-                    printINFO("Logging started");
+                    dataFile = SD.open(filename.c_str(), FILE_WRITE);
+                    if (!dataFile) {
+                        printINFO("Failed to open log file: " + filename);
+                        loggingData = false;
+                    } else {
+                        logBeginTime = millis();
+                        logBeginEpoch = (unsigned long)now();
+                        loggingData = true;
+                        armed = false;
+                        printINFO("Logging started");
+                    }
                 } 
             } else {
                 printINFO("Cannot fire: Arm 2 is not activated");
@@ -144,9 +151,35 @@ void loop() {
     }
 }
 
+String createUniqueFilename() {
+    unsigned long candidate = (unsigned long)now() % maxLogFileIndex + 1;
+    for (unsigned long attempts = 0; attempts < maxLogFileIndex; attempts++) {
+        String number = String(candidate);
+        while (number.length() < 7) {
+            number = "0" + number;
+        }
+
+        String candidateName = "F" + number + ".CSV";
+        if (!SD.exists(candidateName.c_str())) {
+            return candidateName;
+        }
+        candidate = candidate == maxLogFileIndex ? 1 : candidate + 1;
+    }
+    return "";
+}
+
 String generateDataPacket(){ 
-    return String("1,2,3\n");
-    String time = String((unsigned long)now());
+    unsigned long elapsedMillis = millis() - logBeginTime;
+    unsigned long sampleSeconds = logBeginEpoch + elapsedMillis / 1000UL;
+    unsigned int sampleMilliseconds = elapsedMillis % 1000UL;
+    String time = String(sampleSeconds) + ".";
+    if (sampleMilliseconds < 100) {
+        time += "0";
+    }
+    if (sampleMilliseconds < 10) {
+        time += "0";
+    }
+    time += String(sampleMilliseconds);
     String pressure = String(readPressure());
     String thrust = String(loadCell.get_units());
     
