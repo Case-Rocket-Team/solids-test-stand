@@ -28,8 +28,9 @@ void setup() {
     // Initialize Load Cell if enabled
     if (testLoadCell) {
         loadCell.begin(LOAD_DOUT, LOAD_SCK);
-        loadCell.set_scale(calibration_factor);
+        delay(200);
         loadCell.tare();
+        loadCell.set_scale(calibration_factor);
         Serial.println("[INIT] Load Cell initialized and tared.");
     } else {
         Serial.println("[INFO] Load Cell testing is DISABLED.");
