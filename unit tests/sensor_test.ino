@@ -9,7 +9,7 @@ bool testLoadCell = true;
 
 const int LOAD_DOUT = 9;
 const int LOAD_SCK = 10;
-const float calibration_factor = -7050.0; 
+const float calibration_factor = 2179; 
 const int PRESS_PIN = A0;
 const int analogResolutionBits = 14; // Use 10 for non-R4 boards if needed
 

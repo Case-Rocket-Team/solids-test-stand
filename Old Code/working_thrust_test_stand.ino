@@ -15,7 +15,7 @@ const int FIRE = 6;
 const int SD_CS = 8;
 const int LOAD_DOUT = 9;
 const int LOAD_SCK = 10;
-const float calibration_factor = -7050.0; //change to whatever calibration factor of load cell is
+const float calibration_factor = 2179; //change to whatever calibration factor of load cell is
 const int PRESS_PIN = A0;
 const unsigned long armTimeout = 5.0;
 const unsigned long logTimeout = 0.5;
@@ -24,6 +24,8 @@ const unsigned long fireDuration = 100; //time that fire is pulled LOW
 const int analogResolutionBits = 14; //change to 10 for non-R4 boards
 const int sampling_freq = 50; //Hz
 const unsigned long maxLogFileIndex = 9999999UL;
+const byte RELAY_ON = LOW;
+const byte RELAY_OFF = HIGH;
 
 String filename; 
 File dataFile;  
@@ -41,7 +43,7 @@ unsigned long logBeginEpoch;
 bool armed = false;
 bool fired = false;
 bool finishfire = false;
-bool transmitData = true;
+bool transmitData = false;
 
 HX711 loadCell;
 
@@ -59,8 +61,8 @@ void setup(){
     pinMode(ARM2, OUTPUT);
     pinMode(FIRE, OUTPUT);
     delay(1000);
-    digitalWrite(ARM2, HIGH);
-    digitalWrite(FIRE, HIGH);
+    digitalWrite(ARM2, RELAY_OFF);
+    digitalWrite(FIRE, RELAY_OFF);
     
     printINFO("Successfully Initialized");
 
@@ -71,18 +73,18 @@ void loop() {
     
 
     if(loggingData && (millis()-logBeginTime) > fireDelay && fired == false){
-        digitalWrite(ARM2, HIGH);
-        digitalWrite(FIRE, LOW);
+        digitalWrite(ARM2, RELAY_OFF);
+        digitalWrite(FIRE, RELAY_ON);
         printINFO("FIRED");
         fired = true;
         finishfire = true;
         fireTime = millis();
     } else if(!loggingData){
-        digitalWrite(FIRE, HIGH);
+        digitalWrite(FIRE, RELAY_OFF);
     }
 
     if(fired && (millis()- fireTime) > fireDuration && finishfire){
-        digitalWrite(FIRE, HIGH);
+        digitalWrite(FIRE, RELAY_OFF);
         printINFO("Finished Firing");
         finishfire = false;
     }
@@ -90,35 +92,35 @@ void loop() {
     // Add code to stop logging after done launching or smth
     if(loggingData){
         if(float((millis() - logBeginTime)/60000) > logTimeout){
-            // flushDataBuffer();
-            // if(dataFile){
-            //     dataFile.close();
-            // }
+            flushDataBuffer();
+            if(dataFile){
+                dataFile.close();
+            }
             loggingData = false;
             fired = false;
             printINFO("Finished Logging Data");
         }
         else if ((millis() - lastLogMillis) >= (1000/sampling_freq))
         {
-            // // Record data and write etc
-            // data = generateDataPacket();
-            // lastLogMillis = millis();
-            // if (transmitData) {
-            //     writeData2Serial(data);
-            // }
-            // writeData2Card(data);
+            // Record data and write etc
+            data = generateDataPacket();
+            lastLogMillis = millis();
+            if (transmitData) {
+                writeData2Serial(data);
+            }
+            writeData2Card(data);
         }
     }
     if(armed == true && float((millis() - armedTime)/60000) > armTimeout) {
         armed = false;
-        digitalWrite(ARM2, HIGH);
+        digitalWrite(ARM2, RELAY_OFF);
         printINFO("DISARMED: Arm timed out after " + String(armTimeout) + " minutes");
     }
     if(!loggingData && Serial1.available() > 0) {
         String command = Serial1.readStringUntil('\n');
         if(command == "ARM") {
             armed = true;
-            digitalWrite(ARM2, LOW);
+            digitalWrite(ARM2, RELAY_ON);
             armedTime = millis(); 
             printINFO("ARMED");
         } else if(command == "FIRE") {
@@ -127,29 +129,24 @@ void loop() {
                 if (filename.length() == 0) {
                     printINFO("Failed to create a unique log filename");
                 } else {
+                    dataFile = SD.open(filename.c_str(), FILE_WRITE);
+                    if (!dataFile) {
+                        printINFO("Failed to open log file: " + filename);
+                        loggingData = false;
+                    } else {
                         logBeginTime = millis();
                         logBeginEpoch = (unsigned long)now();
                         loggingData = true;
                         armed = false;
                         printINFO("Logging started");
-                    // dataFile = SD.open(filename.c_str(), FILE_WRITE);
-                    // if (!dataFile) {
-                    //     printINFO("Failed to open log file: " + filename);
-                    //     loggingData = false;
-                    // } else {
-                    //     logBeginTime = millis();
-                    //     logBeginEpoch = (unsigned long)now();
-                    //     loggingData = true;
-                    //     armed = false;
-                    //     printINFO("Logging started");
-                    // }
+                    }
                 } 
             } else {
                 printINFO("Cannot fire: Arm 2 is not activated");
             }
         } else if(command == "DISARM") {
             armed = false;
-            digitalWrite(ARM2, HIGH);
+            digitalWrite(ARM2, RELAY_OFF);
             printINFO("DISARMED");
         } else {
             printINFO("Unknown command received");
@@ -159,7 +156,7 @@ void loop() {
 
 String createUniqueFilename() {
     unsigned long candidate = (unsigned long)now() % maxLogFileIndex + 1;
-    for (unsigned long atHIGHts = 0; atHIGHts < maxLogFileIndex; atHIGHts++) {
+    for (unsigned long attempts = 0; attempts < maxLogFileIndex; attempts++) {
         String number = String(candidate);
         while (number.length() < 7) {
             number = "0" + number;

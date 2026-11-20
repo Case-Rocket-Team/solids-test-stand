@@ -27,6 +27,7 @@ void setup(){
         delay(5000);
     }
     dataBuffer.reserve(1024); 
+    Serial.println("SUCESS: SD Initialized."); 
 }
 
 void loop(){

@@ -167,14 +167,11 @@ def sendCommands(serial_com, log_file):
             
 if __name__ == "__main__":
     log_file_name = "testfire_msglog_" + time.strftime("%Y%m%d_%H%M%S") + ".txt"
-    print("Made it 1")
     with open(log_file_name, "a") as log_file:
         ser1 = serial.Serial(PORT, BAUD_RATE, timeout=1)
         ser1.reset_input_buffer()
         ser1.reset_output_buffer()
-
-        print("Made it 2")
-
+        
         if not (arduino_timestamp := serialHandshake(ser1, log_file)):
             logMessage(log_file, "INFO", "Handshake failed. Exiting.", clean_msg=False)
             exit(1)
