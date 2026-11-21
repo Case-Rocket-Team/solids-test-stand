@@ -219,26 +219,26 @@ String createUniqueFilename()
 String generateDataPacket()
 {
     unsigned long elapsedMillis = millis() - logBeginMillis;
-    // unsigned long sampleSeconds = logBeginEpoch + elapsedMillis / 1000UL;
+    unsigned long sampleSeconds = logBeginEpoch + elapsedMillis / 1000UL;
 
-    // unsigned int sampleMilliseconds = elapsedMillis;
+    unsigned int sampleMilliseconds = elapsedMillis;
 
-    // String timestamp = String(sampleSeconds) + ".";
+    String timestamp = String(sampleSeconds) + ".";
 
-    // if (sampleMilliseconds < 100){
-    //     timestamp += "0";
-    // }
+    if (sampleMilliseconds < 100){
+        timestamp += "0";
+    }
 
-    // if (sampleMilliseconds < 10){
-    //     timestamp += "0";
-    // }
+    if (sampleMilliseconds < 10){
+        timestamp += "0";
+    }
 
-    // timestamp += String(sampleMilliseconds);
+    timestamp += String(sampleMilliseconds);
 
     String pressure = String(readPressure());
     String thrust = String(loadCell.get_units());
 
-    return String(elapsedMillis) + "," + thrust + "," + pressure + "\n";
+    return timestamp + "," + thrust + "," + pressure + "\n";
 }
 
 void writeDataToSerial(String packet){

@@ -1,0 +1,19 @@
+[2026-11-21 13:33:20] RX: TIME_REQ
+[2026-11-21 13:33:20] TX: TIME_SYNC:1795286000:COMMANDS
+[2026-11-21 13:33:22] RX: TIME_REQ
+[2026-11-21 13:33:22] TX: TIME_SYNC:1795286002:COMMANDS
+[2026-11-21 13:33:22] RX: TIME_ACK:1795286000
+[2026-11-21 13:33:22] INFO: Handshake successful. Arduino timestamp: 1795286000
+[2026-11-21 13:34:01] TX: ARM
+[2026-11-21 13:34:01] INFO: Arming System.
+[2026-11-21 13:34:01] RX: Unknown command received
+[2026-11-21 13:34:01] RX: ARMED
+[2026-11-21 13:34:30] TX: FIRE
+[2026-11-21 13:34:30] INFO: Firing System.
+[2026-11-21 13:34:30] RX: Logging started
+[2026-11-21 13:34:31] RX: FIRED
+[2026-11-21 13:34:31] INFO: Stand reported: firing relay activated.
+[2026-11-21 13:34:36] RX: Finished Firing
+[2026-11-21 13:34:36] INFO: Stand reported: firing relay released.
+[2026-11-21 13:35:30] RX: Finished Logging Data
+[2026-11-21 13:35:41] INFO: Exiting program.
