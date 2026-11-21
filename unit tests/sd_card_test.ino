@@ -4,7 +4,7 @@
 const int SD_CS = 8;
 const unsigned long maxLogFileIndex = 9999999UL;
 const int test_duration = 1; // minutes
-const int sampling_freq = 100; // Hz
+const int sampling_freq = 10; // Hz
 
 unsigned long lastLogMillis = 0;
 unsigned long logBeginTime = 0;

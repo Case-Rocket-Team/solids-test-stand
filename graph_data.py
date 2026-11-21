@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 
 
 def find_latest_csv():
-    files = glob.glob("testfire_data_*.csv")
+    files = glob.glob("F5273423.csv")
     if not files:
         raise FileNotFoundError("No testfire_data_*.csv file found in the current directory")
     return max(files, key=lambda name: Path(name).stat().st_mtime)

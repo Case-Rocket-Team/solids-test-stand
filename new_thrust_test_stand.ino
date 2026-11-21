@@ -19,12 +19,11 @@ const int PRESSURE_PIN = A0;
 const float LOAD_CALIBRATION_FACTOR = 2179.0;
 
 const unsigned long ARM_TIMEOUT_MS = 5UL * 60UL * 1000UL; // minutes 
-const unsigned long LOG_TIMEOUT_MS = 30UL * 1000UL; // seconds
+const unsigned long LOG_TIMEOUT_MS = 60UL * 1000UL; // seconds
 const unsigned long FIRE_DELAY_MS = 1UL * 1000UL; // ms
-const unsigned long FIRE_DURATION_MS = 1UL * 100UL; //ms
-const unsigned long SAMPLE_FREQ = 200 // Hz
+const unsigned long FIRE_DURATION_MS = 5UL * 1000UL; //s
+const unsigned long SAMPLE_FREQ_HZ = 80; // Hz
 const unsigned long SAMPLE_INTERVAL_MS = 1000UL / SAMPLE_FREQ_HZ;
-
 const int ANALOG_RESOLUTION_BITS = 14;
 const unsigned long MAX_LOG_FILE_INDEX = 9999999UL;
 
@@ -63,7 +62,7 @@ void setup()
         printInfo("SD initialization failed. Ensure the card is inserted and wiring is correct.");
     }
 
-    dataBuffer.reserve(1024);
+    dataBuffer.reserve(15024);
 
     loadCell.begin(LOAD_DOUT_PIN, LOAD_SCK_PIN);
     loadCell.set_scale(LOAD_CALIBRATION_FACTOR);
@@ -220,26 +219,26 @@ String createUniqueFilename()
 String generateDataPacket()
 {
     unsigned long elapsedMillis = millis() - logBeginMillis;
-    unsigned long sampleSeconds = logBeginEpoch + elapsedMillis / 1000UL;
+    // unsigned long sampleSeconds = logBeginEpoch + elapsedMillis / 1000UL;
 
-    unsigned int sampleMilliseconds = elapsedMillis % 1000UL;
+    // unsigned int sampleMilliseconds = elapsedMillis;
 
-    String timestamp = String(sampleSeconds) + ".";
+    // String timestamp = String(sampleSeconds) + ".";
 
-    if (sampleMilliseconds < 100){
-        timestamp += "0";
-    }
+    // if (sampleMilliseconds < 100){
+    //     timestamp += "0";
+    // }
 
-    if (sampleMilliseconds < 10){
-        timestamp += "0";
-    }
+    // if (sampleMilliseconds < 10){
+    //     timestamp += "0";
+    // }
 
-    timestamp += String(sampleMilliseconds);
+    // timestamp += String(sampleMilliseconds);
 
     String pressure = String(readPressure());
     String thrust = String(loadCell.get_units());
 
-    return timestamp + "," + thrust + "," + pressure + "\n";
+    return String(elapsedMillis) + "," + thrust + "," + pressure + "\n";
 }
 
 void writeDataToSerial(String packet){
